@@ -2,6 +2,7 @@ import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, verifyPassword, generateToken } from '@/lib/auth';
+import { sendWelcomeEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
 
 export const authRouter = router({
@@ -48,6 +49,19 @@ export const authRouter = router({
       // Generate token
       const token = generateToken(user.id);
 
+      // Send welcome email (non-blocking)
+      try {
+        await sendWelcomeEmail({
+          to: user.email,
+          username: user.username,
+          email: user.email,
+        });
+        console.log(`欢迎邮件已发送给用户: ${user.email}`);
+      } catch (emailError) {
+        // 邮件发送失败不应该影响注册流程
+        console.error('欢迎邮件发送失败:', emailError);
+      }
+
       return {
         user: {
           id: user.id,
@@ -57,6 +71,7 @@ export const authRouter = router({
           avatar: user.avatar,
         },
         token,
+        message: '注册成功！欢迎邮件已发送到你的邮箱。',
       };
     }),
 
